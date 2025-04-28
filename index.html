@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conector de Audio para Juego Rítmico</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            color: #7289da;
+            margin-bottom: 0.5rem;
+        }
+        .connection-section {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .code-display {
+            font-size: 2.5rem;
+            letter-spacing: 0.5rem;
+            text-align: center;
+            font-weight: bold;
+            color: #43b581;
+            margin: 1.5rem 0;
+        }
+        .status {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            font-weight: bold;
+        }
+        .disconnected {
+            background-color: #f04747;
+            color: white;
+        }
+        .connected {
+            background-color: #43b581;
+            color: white;
+            display: none;
+        }
+        button {
+            background-color: #7289da;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 1rem auto;
+        }
+        button:hover {
+            background-color: #5c6fb1;
+        }
+        .song-list {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        .song-item {
+            background-color: #3d3d3d;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .song-info {
+            flex-grow: 1;
+        }
+        .song-title {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        .song-artist {
+            font-size: 0.9rem;
+            color: #b9bbbe;
+        }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: #b9bbbe;
+            font-size: 0.9rem;
+            padding: 1rem;
+        }
+        .instructions {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        code {
+            background-color: #3d3d3d;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Conector de Audio para Juego Rítmico</h1>
+            <p>Conecta tu juego de Roblox para acceder a la biblioteca de audio externa</p>
+        </header>
+
+        <div class="connection-section">
+            <h2>Conecta tu cuenta</h2>
+            <p>Ingresa este código en tu juego de ritmo en Roblox:</p>
+            <div class="code-display" id="connectionCode">------</div>
+            <div class="status disconnected" id="statusDisconnected">Desconectado</div>
+            <div class="status connected" id="statusConnected">Conectado</div>
+            <button id="generateCode">Generar Nuevo Código</button>
+        </div>
+
+        <div class="instructions">
+            <h2>Instrucciones</h2>
+            <ol>
+                <li>Genera un código de conexión haciendo clic en el botón "Generar Nuevo Código"</li>
+                <li>Abre tu juego de ritmo en Roblox e introduce el código cuando se solicite</li>
+                <li>Una vez conectado, tu juego podrá enviar peticiones HTTP a esta página para reproducir audio</li>
+                <li>Las canciones disponibles aparecerán en la lista inferior cuando estés conectado</li>
+            </ol>
+            <p><strong>Nota:</strong> Esta conexión funciona solo localmente y es necesaria para cada sesión de juego.</p>
+        </div>
+
+        <div class="song-list">
+            <h2>Biblioteca de Canciones</h2>
+            <p>Las canciones aparecerán aquí cuando te conectes:</p>
+            <div id="songContainer">
+                <div class="song-item">
+                    <div class="song-info">
+                        <div class="song-title">Conéctate para ver las canciones disponibles</div>
+                        <div class="song-artist">Necesitas un código de conexión activo</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Este servicio es para uso exclusivo con fines educativos y cumple con las leyes de derechos de autor. No se almacenan archivos con derechos de autor en este repositorio.</p>
+    </footer>
+
+    <script>
+        // Variables para almacenar información de conexión
+        let connectionActive = false;
+        let currentCode = null;
+        let sessionToken = null;
+        const audioMap = new Map();
+        
+        // Elementos DOM
+        const codeDisplay = document.getElementById('connectionCode');
+        const generateBtn = document.getElementById('generateCode');
+        const statusConnected = document.getElementById('statusConnected');
+        const statusDisconnected = document.getElementById('statusDisconnected');
+        const songContainer = document.getElementById('songContainer');
+
+        // Generar código aleatorio de 6 dígitos
+        function generateRandomCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // Actualizar la interfaz cuando se conecta
+        function updateConnectionUI(connected) {
+            connectionActive = connected;
+            statusConnected.style.display = connected ? 'block' : 'none';
+            statusDisconnected.style.display = connected ? 'none' : 'block';
+            
+            if (connected) {
+                loadSongList();
+            } else {
+                songContainer.innerHTML = `
+                    <div class="song-item">
+                        <div class="song-info">
+                            <div class="song-title">Conéctate para ver las canciones disponibles</div>
+                            <div class="song-artist">Necesitas un código de conexión activo</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Cargar lista de canciones (simulada por ahora)
+        function loadSongList() {
+            // En una implementación real, estas canciones se cargarían desde tu repositorio
+            const sampleSongs = [
+                { id: 'song1', title: 'Canción de Ejemplo 1', artist: 'Artista A' },
+                { id: 'song2', title: 'Canción de Ejemplo 2', artist: 'Artista B' },
+                { id: 'song3', title: 'Canción de Ejemplo 3', artist: 'Artista C' }
+            ];
+            
+            let songsHTML = '';
+            sampleSongs.forEach(song => {
+                songsHTML += `
+                    <div class="song-item" data-song-id="${song.id}">
+                        <div class="song-info">
+                            <div class="song-title">${song.title}</div>
+                            <div class="song-artist">${song.artist}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // En una implementación real, aquí mapearías los IDs a las URLs reales
+                audioMap.set(song.id, `audio/${song.id}.mp3`);
+            });
+            
+            songContainer.innerHTML = songsHTML;
+        }
+
+        // Generar nuevo código de conexión
+        generateBtn.addEventListener('click', () => {
+            currentCode = generateRandomCode();
+            sessionToken = crypto.randomUUID();
+            codeDisplay.textContent = currentCode;
+            updateConnectionUI(false);
+            
+            // En una implementación real, almacenaríamos este código en un backend
+            // Para esta demo, simularemos una conexión después de unos segundos
+            setTimeout(() => {
+                updateConnectionUI(true);
+            }, 3000);
+        });
+
+        // API endpoint para que Roblox solicite audio (simulado)
+        // En una implementación real, esto sería manejado por un servidor
+        function handleAudioRequest(songId) {
+            if (!connectionActive) {
+                return { error: 'No hay conexión activa' };
+            }
+            
+            const audioUrl = audioMap.get(songId);
+            if (!audioUrl) {
+                return { error: 'Canción no encontrada' };
+            }
+            
+            return { url: audioUrl, token: sessionToken };
+        }
+
+        // Para propósitos de demostración, inicializamos con UI desconectada
+        updateConnectionUI(false);
+    </script>
+</body>
+</html>

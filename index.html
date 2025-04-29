@@ -224,14 +224,21 @@
 
         <div class="instructions">
             <h2>Instrucciones</h2>
+            <p><strong>Importante: Esta página ahora funciona en modo local (sin backend real).</strong></p>
             <ol>
                 <li>Genera un código de conexión haciendo clic en el botón "Generar Nuevo Código"</li>
                 <li>Abre tu juego de ritmo en Roblox e introduce el código cuando se solicite</li>
                 <li>Una vez conectado, tu juego podrá enviar solicitudes para reproducir audio en esta página</li>
-                <li>El audio se reproducirá aquí, no en Roblox, para evitar problemas de copyright</li>
-                <li>Mantén esta página abierta mientras juegas</li>
+                <li>Los audios en el juego ahora funcionan directamente de Roblox, pero esta interfaz te permite:
+                    <ul>
+                        <li>Probar las canciones antes de jugar</li>
+                        <li>Controlar el volumen externamente</li>
+                        <li>Simular la experiencia del sistema de audio externo</li>
+                    </ul>
+                </li>
+                <li>Mantén esta página abierta mientras juegas para consultar información</li>
             </ol>
-            <p><strong>Nota:</strong> Esta conexión funciona solo localmente y es necesaria para cada sesión de juego.</p>
+            <p><strong>Nota:</strong> El código generado en esta página debe coincidir con el que introduzcas en el juego.</p>
         </div>
 
         <div class="song-list">
@@ -247,7 +254,7 @@
     </div>
 
     <footer>
-        <p>Este servicio reproduce audio externamente para evitar problemas de copyright en Roblox. No se almacenan archivos protegidos por derechos de autor en Roblox.</p>
+        <p>Este servicio simula un reproductor de audio externo. En una versión completa, esto evitaría problemas de copyright en Roblox.</p>
     </footer>
 
     <audio id="audioElement" style="display: none;"></audio>
@@ -278,7 +285,7 @@
         const stopBtn = document.getElementById('stopBtn');
         const volumeBtn = document.getElementById('volumeBtn');
 
-        // Biblioteca de canciones disponibles - CORREGIDO: Se eliminaron las llaves extras
+        // Biblioteca de canciones disponibles
         const songLibrary = [
             { id: 'song1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'audio/song1.mp3' },
             { id: 'song2', title: 'Loli Bomb x1.05', artist: 'Slax', file: 'audio/song2.mp3' },
@@ -301,7 +308,7 @@
             
             if (connected) {
                 loadSongList();
-                addLogEntry('Conexión establecida con éxito', 'success');
+                addLogEntry('Código generado correctamente. Úsalo en tu juego de Roblox.', 'success');
             } else {
                 songContainer.innerHTML = `
                     <div class="song-item">
@@ -349,29 +356,40 @@
             }
             
             currentSong = song;
-            audioElement.src = song.file;
-            audioElement.volume = 1.0;
-            audioElement.play();
+            
+            // En una implementación real, aquí cargaríamos el archivo
+            // Para esta demo, simulamos la reproducción
+            addLogEntry(`Simulando reproducción: "${song.title}" por ${song.artist}`, 'success');
             
             // Actualizar UI
             audioStatus.style.display = 'none';
             audioPlayer.style.display = 'block';
             nowPlaying.textContent = `Reproduciendo: ${song.title} - ${song.artist}`;
             
-            addLogEntry(`Reproduciendo: "${song.title}" por ${song.artist}`, 'success');
-        }
-
-        // Actualizar barra de progreso durante la reproducción
-        audioElement.addEventListener('timeupdate', function() {
-            const progress = (audioElement.currentTime / audioElement.duration) * 100;
-            progressBar.style.width = `${progress}%`;
+            // Simulamos una duración
+            let duration = 180; // 3 minutos en segundos
+            let currentTime = 0;
+            totalTimeDisplay.textContent = formatTime(duration);
             
-            // Actualizar displays de tiempo
-            currentTimeDisplay.textContent = formatTime(audioElement.currentTime);
-            if (!isNaN(audioElement.duration)) {
-                totalTimeDisplay.textContent = formatTime(audioElement.duration);
+            // Simulamos una reproducción con intervalos
+            if (window.playInterval) {
+                clearInterval(window.playInterval);
             }
-        });
+            
+            window.playInterval = setInterval(() => {
+                currentTime += 1;
+                if (currentTime >= duration) {
+                    clearInterval(window.playInterval);
+                    resetPlayer();
+                    return;
+                }
+                
+                // Actualizar UI
+                const progress = (currentTime / duration) * 100;
+                progressBar.style.width = `${progress}%`;
+                currentTimeDisplay.textContent = formatTime(currentTime);
+            }, 1000);
+        }
 
         // Formatear tiempo en formato mm:ss
         function formatTime(seconds) {
@@ -380,15 +398,12 @@
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
         }
 
-        // Manejar fin de reproducción
-        audioElement.addEventListener('ended', function() {
-            resetPlayer();
-        });
-
         // Resetear el reproductor
         function resetPlayer() {
-            audioElement.pause();
-            audioElement.currentTime = 0;
+            if (window.playInterval) {
+                clearInterval(window.playInterval);
+            }
+            
             currentSong = null;
             
             // Actualizar UI
@@ -401,12 +416,37 @@
 
         // Control de reproducción
         playPauseBtn.addEventListener('click', function() {
-            if (audioElement.paused) {
-                audioElement.play();
-                playPauseBtn.textContent = 'Pausa';
-            } else {
-                audioElement.pause();
+            if (!window.isPaused) {
+                window.isPaused = true;
                 playPauseBtn.textContent = 'Reproducir';
+                if (window.playInterval) {
+                    clearInterval(window.playInterval);
+                    window.pausedTime = parseInt(currentTimeDisplay.textContent.split(':')[0]) * 60 + 
+                                        parseInt(currentTimeDisplay.textContent.split(':')[1]);
+                }
+            } else {
+                window.isPaused = false;
+                playPauseBtn.textContent = 'Pausa';
+                
+                // Reiniciar la simulación desde donde se quedó
+                if (currentSong) {
+                    let duration = 180;
+                    let currentTime = window.pausedTime || 0;
+                    
+                    window.playInterval = setInterval(() => {
+                        currentTime += 1;
+                        if (currentTime >= duration) {
+                            clearInterval(window.playInterval);
+                            resetPlayer();
+                            return;
+                        }
+                        
+                        // Actualizar UI
+                        const progress = (currentTime / duration) * 100;
+                        progressBar.style.width = `${progress}%`;
+                        currentTimeDisplay.textContent = formatTime(currentTime);
+                    }, 1000);
+                }
             }
         });
 
@@ -425,7 +465,6 @@
                 volumeLevel = 1.0;
             }
             
-            audioElement.volume = volumeLevel;
             volumeBtn.textContent = `Volumen: ${Math.round(volumeLevel * 100)}%`;
         });
 
@@ -444,45 +483,22 @@
         // Generar nuevo código de conexión
         generateBtn.addEventListener('click', function() {
             currentCode = generateRandomCode();
-            sessionToken = crypto.randomUUID();
+            sessionToken = "token-" + currentCode; // Simular token
             codeDisplay.textContent = currentCode;
-            updateConnectionUI(false);
             
-            addLogEntry(`Nuevo código generado: ${currentCode}`, 'info');
-            
-            // En una implementación real, almacenaríamos este código en un backend
-            // Para esta demo, simularemos una conexión después de unos segundos
-            setTimeout(() => {
-                updateConnectionUI(true);
-            }, 3000);
+            // Simulamos éxito inmediato
+            updateConnectionUI(true);
+            addLogEntry(`Nuevo código generado: ${currentCode}. Úsalo en tu juego de Roblox.`, 'info');
         });
-
-        // Simular recepción de mensajes de Roblox
-        // En una implementación real, esto se haría con WebSockets o Server-Sent Events
-        function setupApiEndpoints() {
-            // Definir una función global que Roblox podría llamar
-            window.playAudioFromRoblox = function(songId) {
-                if (!connectionActive) {
-                    addLogEntry('Solicitud recibida pero no hay conexión activa', 'error');
-                    return { success: false, error: 'No hay conexión activa' };
-                }
-                
-                addLogEntry(`Solicitud recibida para reproducir: ${songId}`, 'info');
-                playSong(songId);
-                return { success: true };
-            };
-            
-            // Configurar un endpoint simulado para solicitudes HTTP
-            // Esto es solo para la demo - una implementación real usaría un servidor real
-            addLogEntry('Sistema de reproducción externa listo', 'info');
-        }
 
         // Para propósitos de demostración, inicializamos con UI desconectada
         updateConnectionUI(false);
-        setupApiEndpoints();
+        addLogEntry('Sistema inicializado. Haz clic en "Generar Nuevo Código" para comenzar.', 'info');
         
-        // Generar un código inicial
-        generateBtn.click();
+        // Generar un código inicial automáticamente
+        setTimeout(() => {
+            generateBtn.click();
+        }, 1000);
     </script>
 </body>
 </html>

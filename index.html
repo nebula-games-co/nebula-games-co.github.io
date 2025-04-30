@@ -285,14 +285,14 @@
         const stopBtn = document.getElementById('stopBtn');
         const volumeBtn = document.getElementById('volumeBtn');
 
-        // Biblioteca de canciones disponibles (con URLs de ejemplo)
+        // Biblioteca de canciones disponibles
         const songLibrary = [
-            { id: '1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/08/04/audio_884fe5a510.mp3?filename=electronic-future-beats-117435.mp3' },
-            { id: '2', title: 'Loli Bomb x1.05', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1eee.mp3?filename=the-beat-of-nature-122841.mp3' },
-            { id: '3', title: 'Loli Bomb x1.10', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=sport-rock-intro-137126.mp3' },
-            { id: '4', title: 'Loli Bomb x1.20', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/01/16/audio_fae98efad5.mp3?filename=forest-lullaby-110624.mp3' },
-            { id: '5', title: 'Loli Bomb x1.30', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/05/16/audio_711bbf1b42.mp3?filename=stomping-rock-four-shots-172565.mp3' },
-            { id: '6', title: 'Loli Bomb x1.40', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2021/11/24/audio_cb31eb1dc6.mp3?filename=powerful-hip-hop-rock-intro-2-97889.mp3' }
+            { id: '1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'audio/song1.mp3' },
+            { id: '2', title: 'Loli Bomb x1.05', artist: 'Slax', file: 'audio/song2.mp3' },
+            { id: '3', title: 'Loli Bomb x1.10', artist: 'Slax', file: 'audio/song3.mp3' },
+            { id: '4', title: 'Loli Bomb x1.20', artist: 'Slax', file: 'audio/song4.mp3' },
+            { id: '5', title: 'Loli Bomb x1.30', artist: 'Slax', file: 'audio/song5.mp3' },
+            { id: '6', title: 'Loli Bomb x1.40', artist: 'Slax', file: 'audio/song6.mp3' }
         ];
 
         // Generar código aleatorio de 6 dígitos
@@ -365,26 +365,36 @@
             audioElement.src = song.file;
             audioElement.volume = volumeLevel;
             
-            // Intentar reproducir y manejar errores
+            // Intentar cargar y reproducir el audio
             audioElement.load();
             
-            const playPromise = audioElement.play();
+            // Agregar registro para depuración
+            addLogEntry(`Cargando archivo: ${song.file}`, 'info');
             
-            if (playPromise !== undefined) {
-                playPromise.then(_ => {
-                    // Reproducción exitosa
-                    addLogEntry(`Reproduciendo: "${song.title}" por ${song.artist}`, 'success');
-                    
-                    // Actualizar UI
-                    audioStatus.style.display = 'none';
-                    audioPlayer.style.display = 'block';
-                    nowPlaying.textContent = `Reproduciendo: ${song.title} - ${song.artist}`;
-                    playPauseBtn.textContent = 'Pausa';
-                    window.isPaused = false;
-                    
-                }).catch(error => {
-                    addLogEntry(`Error al reproducir: ${error.message}`, 'error');
-                });
+            try {
+                const playPromise = audioElement.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        // Reproducción exitosa
+                        addLogEntry(`Reproduciendo: "${song.title}" por ${song.artist}`, 'success');
+                        
+                        // Actualizar UI
+                        audioStatus.style.display = 'none';
+                        audioPlayer.style.display = 'block';
+                        nowPlaying.textContent = `Reproduciendo: ${song.title} - ${song.artist}`;
+                        playPauseBtn.textContent = 'Pausa';
+                        window.isPaused = false;
+                        
+                    }).catch(error => {
+                        addLogEntry(`Error al reproducir: ${error.message}`, 'error');
+                        // Mostrar más detalles sobre el error
+                        console.error('Error al reproducir audio:', error);
+                    });
+                }
+            } catch (error) {
+                addLogEntry(`Error al iniciar reproducción: Verifica que los archivos existan en la carpeta audio/`, 'error');
+                console.error('Error al iniciar reproducción:', error);
             }
             
             // Limpiar cualquier intervalo anterior
@@ -393,6 +403,37 @@
             }
         }
 
+        // Eventos de audio para manejar carga y errores
+        audioElement.addEventListener('loadedmetadata', function() {
+            addLogEntry(`Audio cargado correctamente: duración ${formatTime(audioElement.duration)}`, 'success');
+            totalTimeDisplay.textContent = formatTime(audioElement.duration);
+        });
+        
+        audioElement.addEventListener('error', function(e) {
+            const error = audioElement.error;
+            let errorMsg = "Error desconocido";
+            
+            if (error) {
+                switch(error.code) {
+                    case 1:
+                        errorMsg = "Carga cancelada";
+                        break;
+                    case 2:
+                        errorMsg = "Error de red";
+                        break;
+                    case 3:
+                        errorMsg = "Error de decodificación";
+                        break;
+                    case 4:
+                        errorMsg = "Formato no soportado";
+                        break;
+                }
+            }
+            
+            addLogEntry(`Error de audio: ${errorMsg}. Verifica que el archivo exista en la carpeta audio/`, 'error');
+            console.error('Error detallado:', error);
+        });
+        
         // Actualizar progreso de reproducción
         audioElement.addEventListener('timeupdate', function() {
             const currentTime = audioElement.currentTime;
@@ -453,15 +494,21 @@
                 playPauseBtn.textContent = 'Reproducir';
             } else {
                 // Reproducir
-                const playPromise = audioElement.play();
-                
-                if (playPromise !== undefined) {
-                    playPromise.then(_ => {
-                        window.isPaused = false;
-                        playPauseBtn.textContent = 'Pausa';
-                    }).catch(error => {
-                        addLogEntry(`Error al reproducir: ${error.message}`, 'error');
-                    });
+                try {
+                    const playPromise = audioElement.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.then(_ => {
+                            window.isPaused = false;
+                            playPauseBtn.textContent = 'Pausa';
+                        }).catch(error => {
+                            addLogEntry(`Error al reproducir: ${error.message}`, 'error');
+                            console.error('Error en el botón de reproducción:', error);
+                        });
+                    }
+                } catch (error) {
+                    addLogEntry(`Error al reanudar: Verifica el formato de los archivos de audio`, 'error');
+                    console.error('Error al reanudar reproducción:', error);
                 }
             }
         });

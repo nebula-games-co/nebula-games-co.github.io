@@ -310,6 +310,15 @@
         const apiStatusIndicator = document.getElementById('apiStatusIndicator');
         const apiStatusText = document.getElementById('apiStatusText');
 
+        const savedCode = localStorage.getItem('connectionCode');
+        if (savedCode) {
+            currentCode = savedCode;
+            codeDisplay.textContent = currentCode;
+            connectionActive = true; // Asegurar que el estado de conexión sea correcto
+            updateConnectionUI(true);
+            addLogEntry('Código cargado desde almacenamiento local', 'info');
+        }
+
         // Biblioteca de canciones disponibles
         const songLibrary = [
             { id: '1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'audio/song1.mp3' },
@@ -584,6 +593,7 @@
         // Generar nuevo código de conexión
         generateBtn.addEventListener('click', function() {
             currentCode = generateRandomCode();
+            localStorage.setItem('connectionCode', currentCode);
             sessionToken = "token-" + currentCode; // Simular token
             codeDisplay.textContent = currentCode;
             
@@ -678,9 +688,32 @@
                             const code = urlParams.get('code');
                             const result = verifyConnectionCode(code);
             
-                            // Devolver respuesta como JSON
-                            document.write(JSON.stringify(result));
-                            document.close();
+                            // Configurar headers CORS esenciales
+                            const headers = {
+                                'Content-Type': 'application/json',
+                                'Access-Control-Allow-Origin': '*'
+                            };
+            
+                            // Construir respuesta HTTP válida
+                            const response = JSON.stringify(result);
+                            document.documentElement.innerHTML = response;
+                            document.title = "API Response";
+            
+                            // Agregar meta tags para forzar tipo de contenido
+                            const meta = document.createElement('meta');
+                            meta.httpEquiv = "Content-Type";
+                            meta.content = "application/json; charset=UTF-8";
+                            document.head.appendChild(meta);
+
+                            document.addEventListener('DOMContentLoaded', function() {
+                            if (window.location.search.includes('action=verify')) {
+                                // Solo para el endpoint de verificación
+                                fetch('', { mode: 'no-cors' }).catch(() => {});
+                                document.domain = window.location.hostname;
+                                }
+                            });
+            
+                            addLogEntry(`Solicitud de verificación recibida para código: ${code}`, 'info');
                         }
                     });
                     
@@ -770,6 +803,14 @@
                 console.error('Error al procesar mensaje:', error);
             }
         });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                addLogEntry('Service Worker registrado correctamente', 'success');
+            }).catch(error => {
+                addLogEntry('Error registrando Service Worker: ' + error.message, 'error');
+            });
+        }
     </script>
 </body>
 </html>

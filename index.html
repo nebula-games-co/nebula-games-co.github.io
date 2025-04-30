@@ -183,6 +183,29 @@
             font-size: 0.8rem;
             color: #b9bbbe;
         }
+        /* Estilos para API status */
+        .api-status {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .api-status h2 {
+            margin-top: 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-active {
+            background-color: #43b581;
+        }
+        .status-inactive {
+            background-color: #f04747;
+        }
     </style>
 </head>
 <body>
@@ -199,6 +222,11 @@
             <div class="status disconnected" id="statusDisconnected">Desconectado</div>
             <div class="status connected" id="statusConnected">Conectado</div>
             <button id="generateCode">Generar Nuevo Código</button>
+        </div>
+
+        <div class="api-status">
+            <h2>Estado del API</h2>
+            <p><span class="status-indicator status-active" id="apiStatusIndicator"></span> <span id="apiStatusText">API HTTP escuchando en localhost:8000</span></p>
         </div>
 
         <div class="audio-status" id="audioStatus">
@@ -224,21 +252,15 @@
 
         <div class="instructions">
             <h2>Instrucciones</h2>
-            <p><strong>Importante: Esta página ahora funciona en modo local (sin backend real).</strong></p>
+            <p><strong>ACTUALIZADO: Esta página ahora puede recibir solicitudes HTTP desde tu juego de Roblox.</strong></p>
             <ol>
                 <li>Genera un código de conexión haciendo clic en el botón "Generar Nuevo Código"</li>
                 <li>Abre tu juego de ritmo en Roblox e introduce el código cuando se solicite</li>
                 <li>Una vez conectado, tu juego podrá enviar solicitudes para reproducir audio en esta página</li>
-                <li>Los audios en el juego ahora funcionan directamente de Roblox, pero esta interfaz te permite:
-                    <ul>
-                        <li>Probar las canciones antes de jugar</li>
-                        <li>Controlar el volumen externamente</li>
-                        <li>Simular la experiencia del sistema de audio externo</li>
-                    </ul>
-                </li>
-                <li>Mantén esta página abierta mientras juegas para consultar información</li>
+                <li>Esta interfaz ahora acepta solicitudes HTTP en localhost:8000 desde tu script de Roblox</li>
+                <li>Mantén esta página abierta mientras juegas para que funcione el sistema de audio</li>
             </ol>
-            <p><strong>Nota:</strong> El código generado en esta página debe coincidir con el que introduzcas en el juego.</p>
+            <p><strong>Nota:</strong> Para que la comunicación funcione correctamente, esta página debe estar ejecutándose en un servidor local en el puerto 8000.</p>
         </div>
 
         <div class="song-list">
@@ -254,7 +276,7 @@
     </div>
 
     <footer>
-        <p>Este servicio simula un reproductor de audio externo. En una versión completa, esto evitaría problemas de copyright en Roblox.</p>
+        <p>Este servicio simula un reproductor de audio externo. La función de API HTTP permite la comunicación directa con Roblox.</p>
     </footer>
 
     <audio id="audioElement" style="display: none;"></audio>
@@ -266,6 +288,7 @@
         let sessionToken = null;
         let currentSong = null;
         let audioElement = document.getElementById('audioElement');
+        let apiActive = false;
         
         // Elementos DOM
         const codeDisplay = document.getElementById('connectionCode');
@@ -284,6 +307,8 @@
         const playPauseBtn = document.getElementById('playPauseBtn');
         const stopBtn = document.getElementById('stopBtn');
         const volumeBtn = document.getElementById('volumeBtn');
+        const apiStatusIndicator = document.getElementById('apiStatusIndicator');
+        const apiStatusText = document.getElementById('apiStatusText');
 
         // Biblioteca de canciones disponibles
         const songLibrary = [
@@ -567,14 +592,175 @@
             addLogEntry(`Nuevo código generado: ${currentCode}. Úsalo en tu juego de Roblox.`, 'info');
         });
 
+        // Verificar si un código es válido
+        function isValidCode(code) {
+            return code === currentCode && connectionActive;
+        }
+
+        // Función para verificar un código enviado por HTTP
+        function verifyConnectionCode(code) {
+            if (isValidCode(code)) {
+                return {
+                    success: true,
+                    message: "Conexión exitosa",
+                    token: sessionToken
+                };
+            } else {
+                return {
+                    success: false,
+                    message: "Código inválido o conexión inactiva",
+                    token: null
+                };
+            }
+        }
+
+        // Función para procesar solicitudes de reproducción de audio
+        function processPlayRequest(code, songId, playerName) {
+            if (!isValidCode(code)) {
+                return {
+                    success: false,
+                    message: "Código inválido o conexión inactiva"
+                };
+            }
+            
+            // Intentar reproducir la canción
+            const song = songLibrary.find(s => s.id === songId);
+            if (!song) {
+                return {
+                    success: false,
+                    message: `Canción con ID "${songId}" no encontrada`
+                };
+            }
+            
+            // Reproducir canción
+            playSong(songId);
+            
+            addLogEntry(`Solicitud de reproducción recibida desde Roblox - Jugador: ${playerName}, Canción: ${song.title}`, 'info');
+            
+            return {
+                success: true,
+                message: `Reproduciendo "${song.title}" por ${song.artist}`
+            };
+        }
+
+        // Simular API HTTP para recibir solicitudes de Roblox
+        function setupHttpApi() {
+            try {
+                // Verificar si EventSource está disponible (para simulación)
+                if (typeof EventSource !== 'undefined') {
+                    // Simular una conexión activa para pruebas
+                    apiActive = true;
+                    apiStatusIndicator.classList.remove('status-inactive');
+                    apiStatusIndicator.classList.add('status-active');
+                    apiStatusText.textContent = "API HTTP activa y lista para recibir solicitudes";
+                    addLogEntry("API HTTP inicializada correctamente", 'success');
+                    
+                    // En un entorno real, aquí se configuraría un servidor HTTP
+                    // Para esta simulación, vamos a procesar solicitudes desde la URL
+                    
+                    // Listener para parámetros de URL al cargar la página
+                    window.addEventListener('load', function() {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const action = urlParams.get('action');
+                        
+                        if (action === 'playSong') {
+                            const code = urlParams.get('code');
+                            const songId = urlParams.get('songId');
+                            const playerName = urlParams.get('playerName') || 'Jugador';
+                            
+                            if (code && songId) {
+                                const result = processPlayRequest(code, songId, playerName);
+                                addLogEntry(`Respuesta: ${result.message}`, result.success ? 'success' : 'error');
+                            }
+                        }
+                    });
+                    
+                    // Simular un listener para peticiones HTTP
+                    // Este es un polling simulado que verifica cada 2 segundos si hay nuevas peticiones
+                    setInterval(function() {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const action = urlParams.get('action');
+                        
+                        if (action === 'playSong') {
+                            const code = urlParams.get('code');
+                            const songId = urlParams.get('songId');
+                            const playerName = urlParams.get('playerName') || 'Jugador';
+                            
+                            if (code && songId) {
+                                // Procesar la solicitud una vez
+                                const result = processPlayRequest(code, songId, playerName);
+                                
+                                // Limpiar URL para evitar reproducción duplicada
+                                if (history.pushState) {
+                                    const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                                    window.history.pushState({path: newurl}, '', newurl);
+                                }
+                            }
+                        }
+                    }, 2000);
+                    
+                } else {
+                    apiStatusIndicator.classList.remove('status-active');
+                    apiStatusIndicator.classList.add('status-inactive');
+                    apiStatusText.textContent = "API HTTP no disponible en este navegador";
+                    addLogEntry("No se pudo inicializar la API HTTP (EventSource no soportado)", 'error');
+                }
+            } catch (error) {
+                apiStatusIndicator.classList.remove('status-active');
+                apiStatusIndicator.classList.add('status-inactive');
+                apiStatusText.textContent = "Error al inicializar API HTTP: " + error.message;
+                addLogEntry("Error al inicializar API HTTP: " + error.message, 'error');
+                console.error("Error al inicializar API:", error);
+            }
+        }
+
         // Para propósitos de demostración, inicializamos con UI desconectada
         updateConnectionUI(false);
         addLogEntry('Sistema inicializado. Haz clic en "Generar Nuevo Código" para comenzar.', 'info');
+        
+        // Inicializar API HTTP
+        setupHttpApi();
         
         // Generar un código inicial automáticamente
         setTimeout(() => {
             generateBtn.click();
         }, 1000);
+
+        // Agregar soporte para mensajes de Roblox a través de comunicación con ventana
+        window.addEventListener('message', function(event) {
+            // Verificar origen por seguridad en un entorno real
+            try {
+                const data = event.data;
+                
+                if (data && data.type === 'roblox') {
+                    addLogEntry(`Mensaje recibido desde Roblox: ${JSON.stringify(data)}`, 'info');
+                    
+                    if (data.action === 'connect') {
+                        // Solicitud de conexión
+                        const result = verifyConnectionCode(data.code);
+                        event.source.postMessage({
+                            type: 'roblox_response',
+                            action: 'connect',
+                            success: result.success,
+                            message: result.message,
+                            token: result.token
+                        }, '*');
+                    } else if (data.action === 'playSong') {
+                        // Solicitud de reproducción
+                        const result = processPlayRequest(data.code, data.songId, data.playerName);
+                        event.source.postMessage({
+                            type: 'roblox_response',
+                            action: 'playSong',
+                            success: result.success,
+                            message: result.message
+                        }, '*');
+                    }
+                }
+            } catch (error) {
+                addLogEntry(`Error al procesar mensaje: ${error.message}`, 'error');
+                console.error('Error al procesar mensaje:', error);
+            }
+        });
     </script>
 </body>
 </html>

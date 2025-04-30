@@ -285,14 +285,14 @@
         const stopBtn = document.getElementById('stopBtn');
         const volumeBtn = document.getElementById('volumeBtn');
 
-        // Biblioteca de canciones disponibles
+        // Biblioteca de canciones disponibles (con URLs de ejemplo)
         const songLibrary = [
-            { id: '1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'audio/song1.mp3' },
-            { id: '2', title: 'Loli Bomb x1.05', artist: 'Slax', file: 'audio/song2.mp3' },
-            { id: '3', title: 'Loli Bomb x1.10', artist: 'Slax', file: 'audio/song3.mp3' },
-            { id: '4', title: 'Loli Bomb x1.20', artist: 'Slax', file: 'audio/song4.mp3' },
-            { id: '5', title: 'Loli Bomb x1.30', artist: 'Slax', file: 'audio/song5.mp3' },
-            { id: '6', title: 'Loli Bomb x1.40', artist: 'Slax', file: 'audio/song6.mp3' }
+            { id: '1', title: 'Loli Bomb x1.00', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/08/04/audio_884fe5a510.mp3?filename=electronic-future-beats-117435.mp3' },
+            { id: '2', title: 'Loli Bomb x1.05', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1eee.mp3?filename=the-beat-of-nature-122841.mp3' },
+            { id: '3', title: 'Loli Bomb x1.10', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=sport-rock-intro-137126.mp3' },
+            { id: '4', title: 'Loli Bomb x1.20', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/01/16/audio_fae98efad5.mp3?filename=forest-lullaby-110624.mp3' },
+            { id: '5', title: 'Loli Bomb x1.30', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2022/05/16/audio_711bbf1b42.mp3?filename=stomping-rock-four-shots-172565.mp3' },
+            { id: '6', title: 'Loli Bomb x1.40', artist: 'Slax', file: 'https://cdn.pixabay.com/download/audio/2021/11/24/audio_cb31eb1dc6.mp3?filename=powerful-hip-hop-rock-intro-2-97889.mp3' }
         ];
 
         // Generar código aleatorio de 6 dígitos
@@ -357,44 +357,65 @@
             
             currentSong = song;
             
-            // En una implementación real, aquí cargaríamos el archivo
-            // Para esta demo, simulamos la reproducción
-            addLogEntry(`Simulando reproducción: "${song.title}" por ${song.artist}`, 'success');
+            // Detener cualquier reproducción previa
+            audioElement.pause();
+            audioElement.currentTime = 0;
             
-            // Actualizar UI
-            audioStatus.style.display = 'none';
-            audioPlayer.style.display = 'block';
-            nowPlaying.textContent = `Reproduciendo: ${song.title} - ${song.artist}`;
+            // Configurar el elemento de audio para reproducir el archivo
+            audioElement.src = song.file;
+            audioElement.volume = volumeLevel;
             
-            // Simulamos una duración
-            let duration = 180; // 3 minutos en segundos
-            let currentTime = 0;
-            totalTimeDisplay.textContent = formatTime(duration);
+            // Intentar reproducir y manejar errores
+            audioElement.load();
             
-            // Simulamos una reproducción con intervalos
+            const playPromise = audioElement.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    // Reproducción exitosa
+                    addLogEntry(`Reproduciendo: "${song.title}" por ${song.artist}`, 'success');
+                    
+                    // Actualizar UI
+                    audioStatus.style.display = 'none';
+                    audioPlayer.style.display = 'block';
+                    nowPlaying.textContent = `Reproduciendo: ${song.title} - ${song.artist}`;
+                    playPauseBtn.textContent = 'Pausa';
+                    window.isPaused = false;
+                    
+                }).catch(error => {
+                    addLogEntry(`Error al reproducir: ${error.message}`, 'error');
+                });
+            }
+            
+            // Limpiar cualquier intervalo anterior
             if (window.playInterval) {
                 clearInterval(window.playInterval);
             }
+        }
+
+        // Actualizar progreso de reproducción
+        audioElement.addEventListener('timeupdate', function() {
+            const currentTime = audioElement.currentTime;
+            const duration = audioElement.duration || 0;
             
-            window.playInterval = setInterval(() => {
-                currentTime += 1;
-                if (currentTime >= duration) {
-                    clearInterval(window.playInterval);
-                    resetPlayer();
-                    return;
-                }
-                
-                // Actualizar UI
+            if (!isNaN(duration) && duration > 0) {
                 const progress = (currentTime / duration) * 100;
                 progressBar.style.width = `${progress}%`;
                 currentTimeDisplay.textContent = formatTime(currentTime);
-            }, 1000);
-        }
+                totalTimeDisplay.textContent = formatTime(duration);
+            }
+        });
+        
+        // Cuando termina la canción
+        audioElement.addEventListener('ended', function() {
+            resetPlayer();
+        });
 
         // Formatear tiempo en formato mm:ss
         function formatTime(seconds) {
+            seconds = Math.floor(seconds);
             const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
+            const secs = seconds % 60;
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
         }
 
@@ -402,6 +423,11 @@
         function resetPlayer() {
             if (window.playInterval) {
                 clearInterval(window.playInterval);
+            }
+            
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
             }
             
             currentSong = null;
@@ -412,40 +438,30 @@
             progressBar.style.width = '0%';
             currentTimeDisplay.textContent = '0:00';
             totalTimeDisplay.textContent = '0:00';
+            playPauseBtn.textContent = 'Reproducir';
+            window.isPaused = true;
         }
 
         // Control de reproducción
         playPauseBtn.addEventListener('click', function() {
+            if (!currentSong) return;
+            
             if (!window.isPaused) {
+                // Pausar
+                audioElement.pause();
                 window.isPaused = true;
                 playPauseBtn.textContent = 'Reproducir';
-                if (window.playInterval) {
-                    clearInterval(window.playInterval);
-                    window.pausedTime = parseInt(currentTimeDisplay.textContent.split(':')[0]) * 60 + 
-                                        parseInt(currentTimeDisplay.textContent.split(':')[1]);
-                }
             } else {
-                window.isPaused = false;
-                playPauseBtn.textContent = 'Pausa';
+                // Reproducir
+                const playPromise = audioElement.play();
                 
-                // Reiniciar la simulación desde donde se quedó
-                if (currentSong) {
-                    let duration = 180;
-                    let currentTime = window.pausedTime || 0;
-                    
-                    window.playInterval = setInterval(() => {
-                        currentTime += 1;
-                        if (currentTime >= duration) {
-                            clearInterval(window.playInterval);
-                            resetPlayer();
-                            return;
-                        }
-                        
-                        // Actualizar UI
-                        const progress = (currentTime / duration) * 100;
-                        progressBar.style.width = `${progress}%`;
-                        currentTimeDisplay.textContent = formatTime(currentTime);
-                    }, 1000);
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        window.isPaused = false;
+                        playPauseBtn.textContent = 'Pausa';
+                    }).catch(error => {
+                        addLogEntry(`Error al reproducir: ${error.message}`, 'error');
+                    });
                 }
             }
         });
@@ -454,7 +470,7 @@
             resetPlayer();
         });
 
-        // Control de volumen (simple toggle por ahora)
+        // Control de volumen
         let volumeLevel = 1.0;
         volumeBtn.addEventListener('click', function() {
             if (volumeLevel > 0.5) {
@@ -465,7 +481,20 @@
                 volumeLevel = 1.0;
             }
             
+            if (audioElement) {
+                audioElement.volume = volumeLevel;
+            }
+            
             volumeBtn.textContent = `Volumen: ${Math.round(volumeLevel * 100)}%`;
+        });
+
+        // Click en la barra de progreso para saltar a una posición
+        document.querySelector('.audio-progress').addEventListener('click', function(e) {
+            if (!audioElement.duration) return;
+            
+            const rect = this.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            audioElement.currentTime = pos * audioElement.duration;
         });
 
         // Agregar entradas al registro

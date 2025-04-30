@@ -599,19 +599,19 @@
 
         // Función para verificar un código enviado por HTTP
         function verifyConnectionCode(code) {
-            if (isValidCode(code)) {
-                return {
-                    success: true,
-                    message: "Conexión exitosa",
-                    token: sessionToken
-                };
-            } else {
-                return {
-                    success: false,
-                    message: "Código inválido o conexión inactiva",
-                    token: null
-                };
+            const isValid = code === currentCode && connectionActive;
+    
+            // Limpiar parámetros de la URL después de la verificación
+            if(history.replaceState) {
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
             }
+    
+            return {
+                success: isValid,
+                message: isValid ? "Valid code" : "Invalid code",
+                token: isValid ? sessionToken : null
+            };
         }
 
         // Función para procesar solicitudes de reproducción de audio
@@ -672,6 +672,15 @@
                                 const result = processPlayRequest(code, songId, playerName);
                                 addLogEntry(`Respuesta: ${result.message}`, result.success ? 'success' : 'error');
                             }
+                        }
+
+                        if(urlParams.get('action') === 'verify') {
+                            const code = urlParams.get('code');
+                            const result = verifyConnectionCode(code);
+            
+                            // Devolver respuesta como JSON
+                            document.write(JSON.stringify(result));
+                            document.close();
                         }
                     });
                     
